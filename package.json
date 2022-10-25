@@ -1,0 +1,14 @@
+{
+  "name": "cday-cognito-example",
+  "scripts": {
+    "dev:client": "npm run dev -w react-client",
+    "dev:server": "npm start -w express-server"
+  },
+  "devDependencies": {
+    "prettier": "2.7.1"
+  },
+  "workspaces": [
+    "express-server",
+    "react-client"
+  ]
+}
