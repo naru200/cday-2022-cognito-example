@@ -5,9 +5,11 @@ import App from "./App";
 import "./index.css";
 
 const oidcConfig = {
-  authority: import.meta.env.VITE_COGNITO_ISSUER,
-  client_id: import.meta.env.VITE_COGNITO_CLIENT_ID,
-  redirect_uri: import.meta.env.VITE_BASE_URL,
+  authority: `https://cognito-idp.${
+    import.meta.env.COGNITO_REGION
+  }.amazonaws.com/${import.meta.env.COGNITO_USER_POOL_ID}`,
+  client_id: import.meta.env.COGNITO_CLIENT_ID,
+  redirect_uri: window.location.origin,
   onSigninCallback: () => {
     window.history.replaceState({}, document.title, window.location.pathname);
   },

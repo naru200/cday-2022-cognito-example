@@ -11,40 +11,48 @@ const App = () => {
   const auth = useAuth();
 
   const [specialResult, setSpecialResult] = useState("");
+  const [error, setError] = useState("");
 
   const onSignOut = async () => {
+    // Since the logout endpoint is not registered in Cognito's oidc-configuration path,
+    // the auth.signoutRedirect() method does not work properly.
+    //
+    // Therefore, log out the user from the page using the auth.removeUser() method,
+    // and then redirect the user to Cognito's logout endpoint to log the user out of the Cognito auth session.
     await auth.removeUser();
     location.replace(
-      `${import.meta.env.VITE_COGNITO_ENDPOINT}/logout?client_id=${
-        import.meta.env.VITE_COGNITO_CLIENT_ID
-      }&logout_uri=${import.meta.env.VITE_BASE_URL}`
+      `${import.meta.env.COGNITO_ENDPOINT}/logout?client_id=${
+        import.meta.env.COGNITO_CLIENT_ID
+      }&logout_uri=${window.location.origin}`
     );
   };
 
   const getAccess = async () => {
-    const result = await fetch(
-      import.meta.env.VITE_BACKEND_ENDPOINT + "/grant-access",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${auth.user.access_token}`,
-        },
-      }
-    ).then((res) => res.json());
-
-    alert(result.message);
+    await fetch(import.meta.env.BACKEND_ENDPOINT + "/grant-access", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${auth.user.access_token}`,
+      },
+    }).then(async (res) => {
+      if (res.ok) {
+        alert("Permission Granted! Please sign in again.");
+        onSignOut();
+      } else alert((await res.json()).message);
+    });
   };
 
-  const getSpecialResult = async () => {
-    const result = await fetch(
-      import.meta.env.VITE_BACKEND_ENDPOINT + "/give-me-a-cat",
-      {
-        headers: {
-          Authorization: `Bearer ${auth.user.access_token}`,
-        },
-      }
-    ).then((res) => res.json());
-    setSpecialResult(result.image);
+  const getCatImage = async () => {
+    setSpecialResult("");
+    setError("");
+
+    await fetch(import.meta.env.BACKEND_ENDPOINT + "/cat", {
+      headers: {
+        Authorization: `Bearer ${auth.user.access_token}`,
+      },
+    }).then(async (res) => {
+      if (res.ok) setSpecialResult((await res.json()).image);
+      else setError((await res.json()).message);
+    });
   };
 
   return (
@@ -71,12 +79,12 @@ const App = () => {
                 Get permission
               </button>
               <button
-                onClick={getSpecialResult}
+                onClick={getCatImage}
                 type="button"
                 className="flex w-full justify-center items-center rounded-md border border-transparent bg-orange-500 px-4 py-2 mt-2
                   text-base font-semibold text-white shadow-sm hover:bg-orange-600 focus:outline-none"
               >
-                Special feature (requires permission)
+                Give me a Cat (permission required)
               </button>
 
               {!!specialResult && (
@@ -85,6 +93,12 @@ const App = () => {
                   src={specialResult}
                   alt=""
                 />
+              )}
+
+              {!!error && (
+                <p className="mt-4 font-semibold text-red-600 text-center">
+                  {error}
+                </p>
               )}
 
               <button
@@ -99,6 +113,11 @@ const App = () => {
                 />
                 Sign Out
               </button>
+
+              <div className="font-semibold mt-6 mb-2">Access Token (JWT)</div>
+              <p className="bg-gray-100 rounded-md p-4 text-xs text-gray-700 break-all">
+                {auth.user.access_token}
+              </p>
             </div>
           </div>
         </div>

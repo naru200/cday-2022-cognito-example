@@ -8,6 +8,7 @@ import AWS from "aws-sdk";
 import * as dotenv from "dotenv";
 dotenv.config();
 
+const COGNITO_ISSUER = `https://cognito-idp.${process.env.COGNITO_REGION}.amazonaws.com/${process.env.COGNITO_USER_POOL_ID}`;
 const cognito = new AWS.CognitoIdentityServiceProvider({
   region: process.env.COGNITO_REGION,
 });
@@ -16,13 +17,14 @@ const app = express();
 
 app.use(cors());
 
+app.get("/", (req, res) => res.status(200).send("OK"));
+
 app.use(
   jwt.expressjwt({
     secret: jwks.expressJwtSecret({
-      jwksUri: process.env.COGNITO_JWKS_URI,
+      jwksUri: `${COGNITO_ISSUER}/.well-known/jwks.json`,
     }),
-    audience: process.env.BASE_URL,
-    issuer: process.env.COGNITO_ISSUER,
+    issuer: COGNITO_ISSUER,
     algorithms: ["RS256"],
   })
 );
@@ -43,15 +45,28 @@ app.post("/grant-access", (req, res) => {
   );
 });
 
-app.get("/give-me-a-cat", async (req, res, next) => {
-  try {
-    const cats = await fetch("https://api.thecatapi.com/v1/images/search", {
-      headers: { "x-api-key": process.env.CAT_API_KEY },
-    }).then((res) => res.json());
+app.get("/cat", (req, res) => {
+  if (!req.auth["cognito:groups"]?.includes("audience")) {
+    res
+      .status(403)
+      .json({ message: "You are not authorized to perform this operation." });
+  }
 
-    res.status(200).json({ image: cats[0].url });
-  } catch (error) {
-    next(error);
+  fetch("https://api.thecatapi.com/v1/images/search", {
+    headers: { "x-api-key": process.env.CAT_API_KEY },
+  }).then(async (catResponse) => {
+    if (catResponse.ok) {
+      const cats = catResponse.json();
+      res.status(200).json({ image: cats[0].url });
+    }
+  });
+});
+
+app.use((err, req, res, _) => {
+  if (err.name === "UnauthorizedError") {
+    res.status(401).json({ message: "Invalid token" });
+  } else {
+    res.status(500).json({ message: "Internal server error" });
   }
 });
 
